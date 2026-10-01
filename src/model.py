@@ -22,11 +22,21 @@ class SVDModel:
         print("=" * 70)
         R = user_item_matrix_filled.values
 
-        # Calculate the mean rating for each user
-        self.user_rating_mean = np.mean(R, axis=1)
+        # Calculate user means from observed ratings, excluding missing-value zeros.
+        rated_counts = np.count_nonzero(R, axis=1)
+        self.user_rating_mean = np.divide(
+            R.sum(axis=1),
+            rated_counts,
+            out=np.zeros(R.shape[0], dtype=float),
+            where=rated_counts > 0
+        )
 
-        # Demean the data (subtract user mean from each rating)
-        R_demeaned = R - self.user_rating_mean.reshape(-1, 1)
+        # Keep missing entries at zero so they do not become artificial negatives.
+        R_demeaned = np.where(
+            R > 0,
+            R - self.user_rating_mean.reshape(-1, 1),
+            0
+        )
 
         # Perform SVD
         self.U, sigma, self.Vt = svds(R_demeaned, k=self.n_factors)
