@@ -6,7 +6,7 @@ warnings.filterwarnings('ignore')
 from dataloader import load_data,explore_data,create_user_item_matrix
 from model import SVDModel
 from recommender import MovieRecommender
-from evaluation import evaluate_model, split_user_item_matrix
+from evaluation import evaluate_model, select_rating_threshold, split_user_item_matrix
 
 def main():
 
@@ -19,8 +19,22 @@ def main():
     explore_data(ratings)
     user_item_matrix_filled, user_item_matrix = create_user_item_matrix(ratings)
     train_matrix, test_matrix = split_user_item_matrix(user_item_matrix)
+    fit_matrix, validation_matrix = split_user_item_matrix(
+        train_matrix,
+        random_state=24
+    )
 
-    # --- 2. Train SVD Model ---
+    # --- 2. Tune the rating cutoff using training data only ---
+    validation_model = SVDModel()
+    validation_model.fit(fit_matrix.fillna(0))
+    validation_predictions = validation_model.predict()
+    rating_threshold = select_rating_threshold(
+        validation_predictions,
+        validation_matrix
+    )
+    print(f"Selected rating threshold: {rating_threshold:.4f}")
+
+    # --- 3. Train the final model on all training data ---
     svd_model = SVDModel()
     svd_model.fit(train_matrix.fillna(0))
 
@@ -44,7 +58,11 @@ def main():
     recommender.find_similar_movies(movie_id=1, num_similar=5)
 
 
-    rmse, mae, accuracy, precision, recall = evaluate_model(predictions, test_matrix)
+    rmse, mae, accuracy, precision, recall = evaluate_model(
+        predictions,
+        test_matrix,
+        prediction_threshold=rating_threshold
+    )
 
 
     print("\n" + "="*70)

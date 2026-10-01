@@ -26,7 +26,7 @@ def split_user_item_matrix(user_item_matrix, test_fraction=0.2, random_state=42)
     return train_matrix, test_matrix
 
 
-def evaluate_model(predictions, test_matrix, rating_threshold=4):
+def evaluate_model(predictions, test_matrix, rating_threshold=4, prediction_threshold=None):
 
     print("\n" + "=" * 70)
     print("Model Evaluation")
@@ -38,20 +38,40 @@ def evaluate_model(predictions, test_matrix, rating_threshold=4):
 
     actual_ratings = actual[mask]
     predicted_ratings = predictions[mask]
+    if prediction_threshold is None:
+        prediction_threshold = rating_threshold
 
     rmse = np.sqrt(mean_squared_error(actual_ratings, predicted_ratings))
     mae = np.mean(np.abs(actual_ratings - predicted_ratings))
     actual_positive = actual_ratings >= rating_threshold
-    predicted_positive = predicted_ratings >= rating_threshold
+    predicted_positive = predicted_ratings >= prediction_threshold
     accuracy = accuracy_score(actual_positive, predicted_positive)
     precision = precision_score(actual_positive, predicted_positive, zero_division=0)
     recall = recall_score(actual_positive, predicted_positive, zero_division=0)
 
     print(f"RMSE: {rmse:.4f}")
     print(f"MAE : {mae:.4f}")
-    print(f"Accuracy (rating >= {rating_threshold}): {accuracy:.4f}")
-    print(f"Precision (rating >= {rating_threshold}): {precision:.4f}")
-    print(f"Recall (rating >= {rating_threshold}): {recall:.4f}")
+    print(
+        f"Accuracy (actual >= {rating_threshold}, "
+        f"predicted >= {prediction_threshold:.4f}): {accuracy:.4f}"
+    )
+    print(f"Precision: {precision:.4f}")
+    print(f"Recall: {recall:.4f}")
     print("=" * 70 + "\n")
 
     return rmse, mae, accuracy, precision, recall
+
+
+def select_rating_threshold(predictions, validation_matrix, rating_threshold=4):
+    actual = validation_matrix.values
+    mask = np.isfinite(actual) & (actual > 0)
+    actual_positive = actual[mask] >= rating_threshold
+    predicted_ratings = predictions[mask]
+
+    candidate_thresholds = np.unique(predicted_ratings)
+    accuracies = [
+        accuracy_score(actual_positive, predicted_ratings >= threshold)
+        for threshold in candidate_thresholds
+    ]
+    best_index = int(np.argmax(accuracies))
+    return float(candidate_thresholds[best_index])
